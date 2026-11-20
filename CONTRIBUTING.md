@@ -38,5 +38,5 @@ PYTHONPATH=src python3 -m repo_guard scan .
 1. Update `__version__` in `src/repo_guard/__init__.py` and add the section to `CHANGELOG.md`.
 2. Commit, then push a signed tag: `git tag -s vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`.
 3. The `release` workflow tests, builds, attests, publishes to PyPI and creates the GitHub release.
-4. Update `url` and `sha256` in the Homebrew tap's `Formula/repo-guard.rb`
-   (template: `packaging/homebrew/repo-guard.rb`).
+4. Update `url` (the sdist's permanent URL from `https://pypi.org/pypi/git-repo-guard/X.Y.Z/json`)
+   and `sha256` in the tap's `Formula/repo-guard.rb` (template: `packaging/homebrew/repo-guard.rb`).
