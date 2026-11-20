@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+PLAN.md
+/build/
+/dist/
+*.egg-info/
+*.pyz

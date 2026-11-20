@@ -1,0 +1,7 @@
+- id: repo-guard
+  name: repo-guard (block infected files)
+  description: Refuses commits that add hidden payloads, auto-run tasks, droppers, secrets and other malware indicators.
+  entry: repo-guard pre-commit
+  language: python
+  pass_filenames: true
+  require_serial: true

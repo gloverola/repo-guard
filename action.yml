@@ -1,0 +1,93 @@
+name: repo-guard
+description: Scan a repository (and optionally every branch and tag) for hidden malware, and upload SARIF to code scanning.
+author: repo-guard contributors
+branding:
+  icon: shield
+  color: red
+
+inputs:
+  path:
+    description: Directory to scan.
+    default: "."
+  scope:
+    description: "`worktree` (checked-out files), `all-refs` (every branch and tag; needs fetch-depth 0) or `both`."
+    default: both
+  fail-on:
+    description: Lowest severity that fails the job (high, medium, info, never).
+    default: medium
+  deps:
+    description: Also check lockfiles against OSV malware advisories (uses the network).
+    default: "false"
+  sarif:
+    description: Upload the results to GitHub code scanning (needs `security-events: write`).
+    default: "true"
+  sarif-category:
+    description: Category for the SARIF upload, so push and scheduled scans don't overwrite each other.
+    default: repo-guard
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report.
+    value: ${{ steps.scan.outputs.sarif-file }}
+  exit-code:
+    description: repo-guard's exit code (0 clean, 1 findings, 2 error).
+    value: ${{ steps.scan.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build repo-guard (standard library only, no installs)
+      shell: bash
+      run: |
+        PY=$(command -v python3 || command -v python)
+        "$PY" -I "$GITHUB_ACTION_PATH/scripts/build_pyz.py" "$RUNNER_TEMP/repo-guard.pyz"
+        echo "REPO_GUARD_PY=$PY" >> "$GITHUB_ENV"
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        RG_PATH: ${{ inputs.path }}
+        RG_SCOPE: ${{ inputs.scope }}
+        RG_FAIL_ON: ${{ inputs.fail-on }}
+        RG_DEPS: ${{ inputs.deps }}
+      run: |
+        case "$RG_SCOPE" in
+          worktree) mode=--worktree-only ;;
+          all-refs) mode=--refs-only ;;
+          both) mode= ;;
+          *) echo "::error::scope must be worktree, all-refs or both"; exit 2 ;;
+        esac
+        case "$RG_FAIL_ON" in high|medium|info|never) ;; *) echo "::error::bad fail-on"; exit 2 ;; esac
+        deps=; [ "$RG_DEPS" = true ] && deps=--deps
+        sarif="$RUNNER_TEMP/repo-guard.sarif"
+        set +e
+        "$REPO_GUARD_PY" -I "$RUNNER_TEMP/repo-guard.pyz" scan "$RG_PATH" $mode $deps --fail-on "$RG_FAIL_ON" \
+          --format sarif --output "$sarif"
+        code=$?
+        set -e
+        echo "sarif-file=$sarif" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        [ -f "$sarif" ] || exit 0
+        "$REPO_GUARD_PY" -I - "$sarif" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+        import json, sys
+        res = json.load(open(sys.argv[1]))["runs"][0]["results"]
+        print("### repo-guard: %d finding(s)\n" % len(res))
+        for r in res[:200]:
+            loc = r["locations"][0]["physicalLocation"]
+            line = loc.get("region", {}).get("startLine")
+            path = loc["artifactLocation"]["uri"] + (":%d" % line if line else "")
+            print("- **%s** `%s` [%s] %s" % (r["level"], path, r["ruleId"], r["message"]["text"]))
+        PY
+    - name: Upload SARIF
+      if: ${{ always() && inputs.sarif == 'true' && steps.scan.outputs.sarif-file != '' }}
+      uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        category: ${{ inputs.sarif-category }}
+    - name: Result
+      shell: bash
+      env:
+        CODE: ${{ steps.scan.outputs.exit-code }}
+      run: |
+        if [ "$CODE" = 1 ]; then echo "::error::repo-guard found malware indicators (see the summary and code scanning)"; fi
+        exit "$CODE"

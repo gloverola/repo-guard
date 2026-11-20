@@ -1,0 +1,29 @@
+# repo-guard scanning this repository with its own GitHub Action. Copy this file into
+# any repo (replace `uses: ./` with `uses: gloverola/repo-guard@v1`).
+name: repo-guard
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 5 * * *"   # daily: every branch and tag, catches force-pushes between pushes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # SARIF upload to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: ${{ github.event_name == 'schedule' && '0' || '1' }}
+          persist-credentials: false
+      - uses: ./
+        with:
+          scope: ${{ github.event_name == 'schedule' && 'all-refs' || 'both' }}
+          sarif-category: repo-guard-${{ github.event_name == 'schedule' && 'all-refs' || 'push' }}

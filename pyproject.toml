@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repo-guard"
+dynamic = ["version"]
+description = "Scan every git clone for hidden malware before any of its code can run."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "repo-guard contributors" }]
+keywords = ["security", "malware", "git", "supply-chain", "scanner", "npm", "worm"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+# No runtime dependencies, on purpose: nothing to hijack.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/gloverola/repo-guard"
+Documentation = "https://github.com/gloverola/repo-guard#readme"
+Issues = "https://github.com/gloverola/repo-guard/issues"
+Changelog = "https://github.com/gloverola/repo-guard/blob/main/CHANGELOG.md"
+Security = "https://github.com/gloverola/repo-guard/blob/main/SECURITY.md"
+
+[project.scripts]
+repo-guard = "repo_guard.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["repo_guard"]
+
+[tool.setuptools.dynamic]
+version = { attr = "repo_guard.__version__" }
