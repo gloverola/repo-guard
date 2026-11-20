@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/repo-guard/
+      url: https://pypi.org/project/git-repo-guard/
     permissions:
       id-token: write        # trusted publishing + PEP 740 attestations
     steps:

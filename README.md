@@ -1,7 +1,7 @@
 # repo-guard
 
 [![CI](https://github.com/gloverola/repo-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/gloverola/repo-guard/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/repo-guard)](https://pypi.org/project/repo-guard/)
+[![PyPI](https://img.shields.io/pypi/v/git-repo-guard)](https://pypi.org/project/git-repo-guard/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 **repo-guard scans every git clone for hidden malware before any of its code can run.** It blocks or quarantines infected clones, scans the repos already on your machine, and helps you clean up.
@@ -20,7 +20,7 @@ What makes it different:
 You need **git** and **Python 3.8+**.
 
 ```bash
-pipx install repo-guard          # or: pip install --user repo-guard
+pipx install git-repo-guard      # or: pip install --user git-repo-guard (the command is `repo-guard`)
 brew install gloverola/tap/repo-guard
 ```
 

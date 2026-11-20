@@ -61,7 +61,7 @@ jobs:
           /tmp/venv/bin/pip install dist/*.whl
           /tmp/venv/bin/repo-guard --version
           /tmp/venv/bin/repo-guard selftest
-          ! /tmp/venv/bin/pip show repo-guard | grep -E '^Requires: .+'
+          ! /tmp/venv/bin/pip show git-repo-guard | grep -E '^Requires: .+'
 
   installers:
     strategy:

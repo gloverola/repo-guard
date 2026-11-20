@@ -19,7 +19,7 @@ inputs:
     description: Also check lockfiles against OSV malware advisories (uses the network).
     default: "false"
   sarif:
-    description: Upload the results to GitHub code scanning (needs `security-events: write`).
+    description: "Upload the results to GitHub code scanning (needs `security-events: write`)."
     default: "true"
   sarif-category:
     description: Category for the SARIF upload, so push and scheduled scans don't overwrite each other.

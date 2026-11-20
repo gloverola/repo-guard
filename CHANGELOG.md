@@ -5,7 +5,7 @@ and the project uses [semantic versioning](https://semver.org/).
 
 ## [1.0.0] - 2026-11-20
 
-First public release.
+First public release, published on PyPI as `git-repo-guard` (the command is `repo-guard`).
 
 ### Added
 - Python package with the `repo-guard` command (standard library only), installable with pipx,
