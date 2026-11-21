@@ -39,12 +39,16 @@ class Uninstall(TempDirTest):
         with open(allow.allow_path(), "w") as fh:
             fh.write("* *\n")
         self.assertTrue(global_get("init.templateDir"))
-        calls = []
+        calls, out = [], io.StringIO()
         with mock.patch.object(un, "install_method", return_value=("pipx", "/p")):
-            code = un.uninstall(yes=True, home=self.home, out=io.StringIO(),
+            code = un.uninstall(yes=True, home=self.home, out=out,
                                 run=lambda cmd: calls.append(cmd) or subprocess.CompletedProcess(cmd, 0))
         self.assertEqual(code, 0)
-        self.assertEqual(calls, [["pipx", "uninstall", "git-repo-guard"]])
+        if os.name == "nt":  # files of a running program are locked: the command is printed instead
+            self.assertEqual(calls, [])
+            self.assertIn("pipx uninstall git-repo-guard", out.getvalue())
+        else:
+            self.assertEqual(calls, [["pipx", "uninstall", "git-repo-guard"]])
         self.assertIsNone(global_get("init.templateDir"))
         self.assertFalse(os.path.exists(allow.config_dir()))
         with open(self.zshrc) as fh:
