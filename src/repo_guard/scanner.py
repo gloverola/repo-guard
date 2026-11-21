@@ -5,6 +5,7 @@ import os
 import re
 
 from .findings import INFO, MEDIUM, Finding
+from .progress import status
 from .gitutil import BlobReader, blob_sizes, git, git_dir, is_git_repo
 from .rules import MAX_BLOB, SKIP_DIRS, scan_content
 
@@ -14,11 +15,14 @@ NULL_SHA = "0" * 40
 def scan_worktree(root):
     findings = []
     root = os.path.abspath(root)
+    n = 0
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for fn in filenames:
             full = os.path.join(dirpath, fn)
             rel = os.path.relpath(full, root).replace(os.sep, "/")
+            n += 1
+            status("working files: %d" % n)
             try:
                 if os.path.islink(full) or os.path.getsize(full) > MAX_BLOB:
                     continue
@@ -85,8 +89,9 @@ def scan_refs(repo, refs=None):
     # same bytes can sit under a harmless name in one place and a disguised one in another.
     blobs = {}
     findings = []
-    for ref in refs:
+    for i, ref in enumerate(refs, 1):
         short = short_ref(ref)
+        status("listing branches and tags: %d/%d" % (i, len(refs)))
         # No -l: asking for sizes would lazily download missing blobs in a partial clone.
         r = git(repo, "ls-tree", "-r", "-z", "--full-tree", ref, check=False)
         if r.returncode != 0:
@@ -126,8 +131,10 @@ def scan_blobs(repo, blobs):
     if missing:
         findings.append(Finding(INFO, "not-fetched", "(partial clone)",
                                 "%d files weren't downloaded (partial clone) and were not scanned" % missing))
+    total = len(blobs)
     with BlobReader(repo) as reader:
-        for sha, paths in blobs.items():
+        for i, (sha, paths) in enumerate(blobs.items(), 1):
+            status("reading files from git: %d/%d" % (i, total))
             data = reader.read(sha)
             if data is None:
                 continue
@@ -141,6 +148,7 @@ def scan_blobs(repo, blobs):
 def check_history(repo, flagged_paths, limit=500):
     """Rewritten commits: committer date differs from author date. Reported as INFO, or
     MEDIUM when the rewritten commit changed a file that has findings."""
+    status("checking commit history")
     r = git(repo, "log", "--all", "--no-merges", "-n", str(limit),
             "--format=%x01%H%x09%at%x09%ai%x09%ct%x09%ci%x09%ce", "--name-only", check=False)
     if r.returncode != 0:

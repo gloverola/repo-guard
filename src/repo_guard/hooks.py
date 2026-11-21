@@ -12,6 +12,7 @@ import sys
 from . import allow
 from .findings import INFO, fails
 from .gitutil import IS_WINDOWS, git, git_env, toplevel
+from .progress import spinning
 from .report import Result, print_text
 from .scanner import NULL_SHA, scan_blobs, scan_refs, scan_worktree
 
@@ -271,8 +272,9 @@ def hook_post_checkout(args, fail_on="medium"):
         if old and new and old != new:
             return _warn_on_diff(repo, old, new, "checkout")
         return 0
-    findings, nrefs = scan_refs(repo)
-    findings += scan_worktree(repo)
+    with spinning("repo-guard: scanning the new clone"):
+        findings, nrefs = scan_refs(repo)
+        findings += scan_worktree(repo)
     kept, allowed = _filtered(findings, repo)
     result = Result(repo, kept, nrefs, allowed, "%d branches/tags, first checkout" % nrefs)
     if not fails(kept, fail_on):
@@ -324,7 +326,8 @@ def _warn_on_diff(repo, old, new, what):
     if len(blobs) > MAX_DIFF_BLOBS:  # huge branch switch: don't stall git; suggest a full scan
         sys.stderr.write("repo-guard: %d files changed; run `repo-guard scan` to check them\n" % len(blobs))
         return 0
-    findings, _ = _filtered(scan_blobs(repo, blobs), repo)
+    with spinning("repo-guard: scanning files changed by this " + what):
+        findings, _ = _filtered(scan_blobs(repo, blobs), repo)
     findings = [f for f in findings if f.sev != INFO]
     if findings:
         print_text(Result(repo, findings, note="files changed by this " + what), stream=sys.stderr)
@@ -363,7 +366,8 @@ def pre_commit(paths=(), fail_on="medium", fmt="text"):
         sys.stderr.write("repo-guard: not inside a git repository\n")
         return 2
     rel = [os.path.relpath(os.path.abspath(p), repo).replace(os.sep, "/") for p in paths]
-    findings = scan_blobs(repo, staged_blobs(repo, rel))
+    with spinning("repo-guard: scanning staged changes"):
+        findings = scan_blobs(repo, staged_blobs(repo, rel))
     kept, allowed = _filtered(findings, repo)
     result = Result(repo, kept, allowed=allowed, note="staged changes")
     if fmt != "text":

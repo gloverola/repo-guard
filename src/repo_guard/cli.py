@@ -7,6 +7,7 @@ import sys
 
 from . import __version__, allow
 from .findings import fails
+from .progress import paused, spinning, status
 
 if sys.version_info < (3, 8):
     sys.exit("repo-guard needs Python 3.8 or newer")
@@ -22,6 +23,7 @@ commands:
   pre-commit [FILES]   block commits that add infected files
   clean [PATH]         propose a fix for an infected working tree; applies only after you confirm
   rules                list detection rules
+  uninstall            remove repo-guard (hooks, shell wrapper, config and the program)
   mcp                  run the MCP server (stdio) for AI agents
   selftest             check that detection and blocking work on this machine
 
@@ -90,6 +92,10 @@ def build_parser():
     p = sub.add_parser("rules", help="list detection rules")
     p.add_argument("--format", choices=("text", "json"), default="text")
 
+    p = sub.add_parser("uninstall", help="remove repo-guard from this machine")
+    p.add_argument("--yes", action="store_true", help="don't ask for confirmation")
+    p.add_argument("--keep-allowlist", action="store_true", help="keep ~/.config/repo-guard/allow")
+
     sub.add_parser("mcp", help="run the MCP server on stdio")
     sub.add_parser("selftest", help="check that detection works on this machine")
     sub.add_parser("allowlist", help="show where the allowlist lives and what it contains")
@@ -108,11 +114,12 @@ def cmd_scan(args):
     if not os.path.isdir(args.path):
         return die("not a directory: %s" % args.path)
     mode = "worktree" if args.worktree_only else "refs" if args.refs_only else "both"
-    findings, nrefs = scan_repo(args.path, mode, history=not args.no_history)
-    if args.deps:
-        from .deps import check_files, collect_worktree
-        findings += check_files(collect_worktree(args.path))
     target = os.path.abspath(args.path)
+    with spinning("repo-guard: scanning " + (os.path.basename(target) or target)):
+        findings, nrefs = scan_repo(args.path, mode, history=not args.no_history)
+        if args.deps:
+            from .deps import check_files, collect_worktree
+            findings += check_files(collect_worktree(args.path))
     kept, allowed = allow.apply(findings, target)
     note = "%d branches/tags + working files" % nrefs if nrefs and mode == "both" else \
         "%d branches/tags" % nrefs if nrefs else ""
@@ -120,43 +127,54 @@ def cmd_scan(args):
 
 
 def cmd_scan_all(args):
+    from .report import color
+    root = os.path.abspath(os.path.expanduser(args.root))
+    results = []
+    with spinning("repo-guard: looking for repos under " + root):
+        _scan_all(root, args, results)
+    errors = sum(1 for r in results if r is None)
+    results = [r for r in results if r is not None]
+    if args.format == "text" and not args.output:
+        args.quiet = True  # list only infected repos, then a summary
+    status_code = _finish(results, args)
+    if args.format == "text" and not args.output:
+        bad = sum(1 for r in results if fails(r.findings, args.fail_on))
+        msg = "%d repos scanned under %s: %s" % (len(results), root, "%d with findings" % bad if bad else "all clean")
+        sys.stdout.write(color("repo-guard: " + msg + "\n", "1;31" if bad else "32"))
+    return 2 if errors and not status_code else status_code
+
+
+def _scan_all(root, args, results):
     from .report import Result, color
     from .rules import SKIP_DIRS
     from .scanner import scan_repo
-    root = os.path.abspath(os.path.expanduser(args.root))
-    results, errors = [], 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         if ".git" in os.listdir(dirpath):
             dirnames[:] = []
+            status("", label="repo-guard: scanning repo %d: %s" % (len(results) + 1, os.path.basename(dirpath)))
             try:
                 findings, nrefs = scan_repo(dirpath)
                 if args.deps:
                     from .deps import check_files, collect_worktree
                     findings += check_files(collect_worktree(dirpath))
             except Exception as e:  # one broken repo must not end the sweep
-                sys.stderr.write(color("repo-guard: %s\n  ERROR  scan failed: %r\n" % (dirpath, e), "1;31",
-                                       sys.stderr))
-                errors += 1
+                with paused():
+                        sys.stderr.write(color("repo-guard: %s\n  ERROR  scan failed: %r\n" % (dirpath, e), "1;31",
+                                           sys.stderr))
+                results.append(None)
                 continue
             kept, allowed = allow.apply(findings, dirpath)
             results.append(Result(dirpath, kept, nrefs, allowed))
-    if args.format == "text" and not args.output:
-        args.quiet = True  # list only infected repos, then a summary
-    status = _finish(results, args)
-    if args.format == "text" and not args.output:
-        bad = sum(1 for r in results if fails(r.findings, args.fail_on))
-        msg = "%d repos scanned under %s: %s" % (len(results), root, "%d with findings" % bad if bad else "all clean")
-        sys.stdout.write(color("repo-guard: " + msg + "\n", "1;31" if bad else "32"))
-    return 2 if errors and not status else status
 
 
 def cmd_check(args):
     from .remote import CheckError, check
     from .report import Result
     try:
-        findings, scanned, label = check(args.url, refs=args.ref, all_branches=args.all_branches,
-                                         want_deps=args.deps)
+        with spinning("repo-guard: checking " + args.url):
+            findings, scanned, label = check(args.url, refs=args.ref, all_branches=args.all_branches,
+                                             want_deps=args.deps)
     except CheckError as e:
         return die(str(e))
     kept, allowed = allow.apply(findings, label)
@@ -210,10 +228,11 @@ def enable_windows_ansi():
     try:
         import ctypes
         k = ctypes.windll.kernel32
-        h = k.GetStdHandle(-11)
-        mode = ctypes.c_uint32()
-        if k.GetConsoleMode(h, ctypes.byref(mode)):
-            k.SetConsoleMode(h, mode.value | 0x0004)  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        for std in (-11, -12):  # stdout, stderr (the progress spinner)
+            h = k.GetStdHandle(std)
+            mode = ctypes.c_uint32()
+            if k.GetConsoleMode(h, ctypes.byref(mode)):
+                k.SetConsoleMode(h, mode.value | 0x0004)  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
     except Exception:
         pass
 
@@ -240,10 +259,14 @@ def run(argv):
         return serve()
     if args.cmd == "selftest":
         from .selftest import run as selftest
-        return selftest()
+        with spinning("repo-guard: running selftest"):
+            return selftest()
     if args.cmd == "pre-commit":
         from .hooks import pre_commit
         return pre_commit(args.files, args.fail_on, args.format)
+    if args.cmd == "uninstall":
+        from .uninstall import uninstall
+        return uninstall(yes=args.yes, keep_allowlist=args.keep_allowlist)
     if args.cmd == "clean":
         from .clean import clean
         if not os.path.isdir(args.path):

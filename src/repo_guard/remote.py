@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 
 from .findings import INFO, MEDIUM, Finding
+from .progress import status
 from .rules import MAX_BLOB, SKIP_DIRS, scan_content
 
 MAX_ARCHIVE = 300 * 1024 * 1024
@@ -81,6 +82,7 @@ def scan_archive(fileobj, label, want_deps=False):
     n = 0
     for path, data in iter_archive(fileobj):
         n += 1
+        status("%s: scanned %d files" % (label, n))
         for f in scan_content(path, data, committed=True):
             f.where = [label]
             findings.append(f)
@@ -111,6 +113,7 @@ def check(spec, refs=None, all_branches=False, want_deps=False):
     wanted = wanted or ["HEAD"]
     findings, locks, scanned = [], {}, 0
     for r in dict.fromkeys(wanted):
+        status("downloading %s/%s@%s" % (owner, repo, r))
         url = "https://github.com/%s/%s/archive/%s.tar.gz" % (owner, repo, urllib.parse.quote(r, safe=""))
         try:
             with _open(url) as resp:

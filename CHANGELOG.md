@@ -3,6 +3,17 @@
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and the project uses [semantic versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-21
+
+### Added
+- `repo-guard uninstall`: turns off the git template hooks (restoring any previous
+  `init.templateDir`), removes the shell wrapper blocks, deletes the config folder (or keeps the
+  allowlist with `--keep-allowlist`), and removes the program however it was installed
+  (pipx, Homebrew, pip, install scripts). Asks first; `--yes` skips the question.
+- A progress line on the terminal while repo-guard works ("scanning my-app · reading files
+  from git: 884/2423"). Only shown on a terminal; off in pipes, CI, JSON/SARIF output and the
+  MCP server, or with `REPO_GUARD_NO_PROGRESS=1`.
+
 ## [1.0.0] - 2026-11-20
 
 First public release, published on PyPI as `git-repo-guard` (the command is `repo-guard`).

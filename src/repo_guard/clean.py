@@ -192,8 +192,10 @@ def apply_plan(root, plan):
 
 def clean(root, yes=False, out=None, inp=None):
     out = out or sys.stdout
+    from .progress import spinning
     root = os.path.abspath(root)
-    plan = plan_clean(root)
+    with spinning("repo-guard: working out the fix"):
+        plan = plan_clean(root)
     if plan.empty():
         out.write("repo-guard clean: nothing to fix automatically in %s\n" % root)
         for path, rule in plan.manual:
@@ -213,7 +215,8 @@ def clean(root, yes=False, out=None, inp=None):
             out.write("Nothing changed.\n")
             return 1
     apply_plan(root, plan)
-    remaining = [f for f in scan_worktree(root) if f.sev != INFO]
+    with spinning("repo-guard: rescanning"):
+        remaining = [f for f in scan_worktree(root) if f.sev != INFO]
     out.write("\nApplied. %s\n" % ("The working tree now scans clean." if not remaining else
                                    "%d finding(s) remain; review them by hand." % len(remaining)))
     out.write("Next: review `git diff`, commit, and run `repo-guard scan --refs-only .`: other branches and tags\n"

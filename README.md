@@ -24,6 +24,8 @@ pipx install git-repo-guard      # or: pip install --user git-repo-guard (the co
 brew install gloverola/tap/repo-guard
 ```
 
+(Homebrew can sit silently for a few minutes while it updates itself first; `HOMEBREW_NO_AUTO_UPDATE=1 brew install gloverola/tap/repo-guard` skips that.)
+
 Then turn on automatic protection and check it works:
 
 ```bash
@@ -68,6 +70,7 @@ repo-guard clean .                   # propose a fix, show the diff, apply after
 repo-guard rules                     # list detection rules
 ```
 
+While it works, repo-guard shows a progress line on your terminal (turn it off with `REPO_GUARD_NO_PROGRESS=1`).
 Exit codes: `0` clean, `1` findings at or above `--fail-on` (default `medium`), `2` error.
 Output: `--format text|json|sarif`, `--output FILE`.
 
@@ -140,6 +143,14 @@ Also set `"task.allowAutomaticTasks": "off"` and keep Workspace Trust on in VS C
 - It skips `node_modules`, build output and files over 5 MB, and does not fetch submodules.
 - Template hooks run after git has written the files (then delete them); `repo-guard clone` is stricter because nothing is written until the scan passes.
 - A global `core.hooksPath` disables template hooks; `setup` warns about it.
+
+## Uninstall
+
+```bash
+repo-guard uninstall
+```
+
+It lists what it will do and asks first: turns off the git hooks (restoring your previous `init.templateDir`), removes the shell wrapper, deletes `~/.config/repo-guard` (add `--keep-allowlist` to keep your allowlist), and removes the program however you installed it (pipx, Homebrew, pip or the install scripts). Repos cloned meanwhile keep a small hook that does nothing once repo-guard is gone.
 
 ## More
 

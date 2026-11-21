@@ -7,6 +7,7 @@ import re
 import urllib.request
 
 from .findings import HIGH, INFO, Finding
+from .progress import status
 from .rules import SKIP_DIRS
 
 OSV_BATCH = "https://api.osv.dev/v1/querybatch"
@@ -105,6 +106,7 @@ def check_files(files):
     if not entries:
         return []
     uniq = sorted({(e, n, v) for _, e, n, v in entries})
+    status("asking OSV about %d locked packages" % len(uniq))
     try:
         hits = query_osv(uniq)
     except (OSError, ValueError) as e:

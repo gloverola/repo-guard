@@ -9,6 +9,7 @@ from . import allow
 from .findings import INFO, Finding, fails
 from .gitutil import GIT_SAFE, git, git_env
 from .report import Result, color, emit
+from .progress import spinning
 from .scanner import check_history, scan_refs
 
 VALUE_OPTS = {"-b", "--branch", "--depth", "-o", "--origin", "-c", "--config", "--reference",
@@ -68,8 +69,9 @@ def clone(args, out=None):
                        env=git_env(HARD_ENV))
     if r.returncode != 0:
         return r.returncode
-    findings, nrefs = scan_refs(target)
-    findings += check_history(target, {f.path for f in findings if f.sev != INFO})
+    with spinning("repo-guard: scanning every branch and tag before checkout"):
+        findings, nrefs = scan_refs(target)
+        findings += check_history(target, {f.path for f in findings if f.sev != INFO})
     gm = git(target, "show", "HEAD:.gitmodules", check=False)
     if gm.returncode == 0:
         urls = [ln.split("=", 1)[1].strip() for ln in gm.stdout.decode("utf-8", "replace").splitlines()
